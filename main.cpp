@@ -125,17 +125,15 @@ LD solveFromFile(const string& filename) {
     LD bestC = -1;
     int maxFreq = 0;
     for (auto it = freqMap.begin(); it != freqMap.end(); ++it) {
-    if (it->second > maxFreq) {
-        maxFreq = it->second;
-        bestC = it->first;
+        if (it->second > maxFreq) {
+            maxFreq = it->second;
+            bestC = it->first;
+        }
     }
-}
-
-
     return bestC;
 }
 
-// ---------- Main ----------
+
 int main() {
     LD secret1 = solveFromFile("testcase1.json");
     LD secret2 = solveFromFile("testcase2.json");
