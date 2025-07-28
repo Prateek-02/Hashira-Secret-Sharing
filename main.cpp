@@ -4,7 +4,9 @@
 #include <map>
 #include <cmath>
 #include <algorithm>
-#include "json.hpp"  // Make sure json.hpp is in same folder
+#include <iomanip> 
+#include <set>
+#include "json.hpp"
 
 using json = nlohmann::json;
 using namespace std;
@@ -12,7 +14,7 @@ using namespace std;
 using LD = long double;
 const LD EPS = 1e-9;
 
-// ----------- Decode Base-X to Decimal ------------
+// Decode base-x value 
 LD decodeBaseX(string value, int base) {
     LD result = 0;
     for (char c : value) {
@@ -24,26 +26,30 @@ LD decodeBaseX(string value, int base) {
     return result;
 }
 
-// ------------ Determinant (Recursive) -------------
+//  Calculate Determinant
 LD determinant(vector<vector<LD>> mat) {
     int n = mat.size();
     if (n == 1) return mat[0][0];
     if (n == 2)
-        return mat[0][0]*mat[1][1] - mat[0][1]*mat[1][0];
+        return mat[0][0] * mat[1][1] - mat[0][1] * mat[1][0];
 
     LD det = 0;
     for (int p = 0; p < n; ++p) {
-        vector<vector<LD>> submat(n-1, vector<LD>(n-1));
-        for (int i = 1; i < n; ++i)
-            for (int j = 0, col = 0; j < n; ++j)
-                if (j != p)
-                    submat[i-1][col++] = mat[i][j];
+        vector<vector<LD>> submat(n - 1, vector<LD>(n - 1));
+        for (int i = 1; i < n; ++i) {
+            int colIndex = 0;
+            for (int j = 0; j < n; ++j) {
+                if (j != p) {
+                    submat[i - 1][colIndex++] = mat[i][j];
+                }
+            }
+        }
         det += mat[0][p] * pow(-1, p) * determinant(submat);
     }
     return det;
 }
 
-// ---------- Solve Using Cramer's Rule ----------
+// Solve using Cramer's Rule 
 LD solveConstantTerm(const vector<pair<LD, LD>>& points, int k) {
     vector<vector<LD>> A(k, vector<LD>(k));
     vector<LD> B(k);
@@ -58,7 +64,7 @@ LD solveConstantTerm(const vector<pair<LD, LD>>& points, int k) {
     }
 
     LD detA = determinant(A);
-    if (fabs(detA) < EPS) return -1; // invalid
+    if (fabs(detA) < EPS) return -1;
 
     // Replace last column with B
     vector<vector<LD>> A_const = A;
@@ -67,14 +73,30 @@ LD solveConstantTerm(const vector<pair<LD, LD>>& points, int k) {
 
     LD detConst = determinant(A_const);
     LD constantTerm = detConst / detA;
-    return round(constantTerm);  // final secret
+    return round(constantTerm);
 }
 
-// ---------- Parse JSON and Solve -----------
+// Generate all combinations
+void generateCombinations(const vector<pair<LD, LD>>& points, int k, int idx, vector<pair<LD, LD>>& current, map<LD, int>& freqMap) {
+    if (current.size() == k) {
+        LD secret = solveConstantTerm(current, k);
+        if (secret != -1)
+            freqMap[secret]++;
+        return;
+    }
+
+    for (int i = idx; i < points.size(); ++i) {
+        current.push_back(points[i]);
+        generateCombinations(points, k, i + 1, current, freqMap);
+        current.pop_back();
+    }
+}
+
+//Solve from a file 
 LD solveFromFile(const string& filename) {
     ifstream file(filename);
     if (!file) {
-        cerr << "Error: Cannot open " << filename << endl;
+        cerr << "Error opening " << filename << endl;
         return -1;
     }
 
@@ -86,33 +108,40 @@ LD solveFromFile(const string& filename) {
 
     vector<pair<LD, LD>> points;
     for (auto it = j.begin(); it != j.end(); ++it) {
-    if (it.key() == "keys") continue;
-    int x = stoi(it.key());
-    int base = stoi(it.value()["base"].get<string>());
-    string valStr = it.value()["value"];
-    LD y = decodeBaseX(valStr, base);
-    points.push_back({x, y});
+        if (it.key() == "keys") continue;
+        int x = stoi(it.key());
+        int base = stoi(it.value()["base"].get<string>());
+        string valStr = it.value()["value"];
+        LD y = decodeBaseX(valStr, base);
+        points.push_back({x, y});
+    }
+
+    // Generate all combinations of k out of n and vote on constant term
+    map<LD, int> freqMap;
+    vector<pair<LD, LD>> current;
+    generateCombinations(points, k, 0, current, freqMap);
+
+    // Find the most frequent c
+    LD bestC = -1;
+    int maxFreq = 0;
+    for (auto it = freqMap.begin(); it != freqMap.end(); ++it) {
+    if (it->second > maxFreq) {
+        maxFreq = it->second;
+        bestC = it->first;
+    }
 }
 
 
-    // Sort to ensure consistent results
-    sort(points.begin(), points.end());
-
-    // Use first k points
-    vector<pair<LD, LD>> subset(points.begin(), points.begin() + k);
-    return solveConstantTerm(subset, k);
+    return bestC;
 }
 
-// -------------- Main ---------------
+// ---------- Main ----------
 int main() {
-    string file1 = "testcase1.json";
-    string file2 = "testcase2.json";
+    LD secret1 = solveFromFile("testcase1.json");
+    LD secret2 = solveFromFile("testcase2.json");
 
-    LD secret1 = solveFromFile(file1);
-    LD secret2 = solveFromFile(file2);
-
-    cout << "Secret from Testcase 1: " << secret1 << endl;
-    cout << "Secret from Testcase 2: " << secret2 << endl;
+    cout << "Secret from Testcase 1: "<< std::fixed << std::setprecision(0) << secret1 << endl;
+    cout << "Secret from Testcase 2: "<< std::fixed << std::setprecision(0)  << secret2 << endl;
 
     return 0;
 }
